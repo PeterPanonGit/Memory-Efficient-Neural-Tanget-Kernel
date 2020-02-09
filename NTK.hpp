@@ -80,49 +80,37 @@ private:
 };
 
 // This function compute and update the S and H matrix
-//   given two datasets with N1 data points and N2 data points.
-// dep: we are computing the S and H matrix for hidden layer dep
-// fix_dep: first fix_dep of the infinite wide neural network
-//   is not trained.
-// if dep < fix_dep, only S is updated
-// P1: the sqrt of L2 norm of data set 1, shape: (N1,)
-// P2: the sqrt of L2 norm of data set 2, shape: (N2,)
-// S: the embedding covariance matrix at dep, shape: (N1, N2)
+//   given two datasets with n1 data points and n2 data points.
+// p1: the sqrt of L2 norm of data set 1, shape: (n1,)
+// p2: the sqrt of L2 norm of data set 2, shape: (n2,)
+// The python wrapper guarantees that p1 and p2 > 1e-9 to avoid divison by 0.
+// S: the activation covariance matrix at dep, shape: (n1, n2)
 // H: is the Neural Tangent Kernel matrix at dep, shape: (N1, N2)
 // Reference paper: https://arxiv.org/pdf/1910.01663.pdf
 // Reference python implementation: https://github.com/LeoYu/neural-tangent-kernel-UCI/blob/master/NTK.py
 // Comparing with python implementation, this C++ implementation
 //   compute everything in place and thus significantly saves memory.
 template <class T>
-void Ntk(const int dep,
-         const int fix_dep,
-         const std::vector<T>& P1,
-         const std::vector<T>& P2,
+void Ntk(const std::vector<T>& p1,
+         const std::vector<T>& p2,
          Matrix<T>& S,
          Matrix<T>& H) {
-    const T epsilon = 1e-9;
     // The following logic implements the recursive relation
     //   of covariance matrix S and neural kernel matrix H in place.
     // The recursive relation is described in page 3 of
     //   https://arxiv.org/pdf/1905.12173.pdf, where:
-    // H_k = S_k + H_(k-1) * kappa0(Sn), H_0 = K_0 = cov(x1, x2)
+    // H_k = S_k + H_(k-1) * kappa0(Sn)
     for (int i = 0; i < S.nrow(); ++i) { 
         for (int j = 0; j < S.ncol(); ++j) {
-            // p1 and p2 are clipped at 1e-9 to avoid division by 0
-            const T p1 = std::max(P1[i], epsilon);
-            const T p2 = std::max(P2[j], epsilon);
             // Sn is correlation between data i and j,
             // and thus must be in [-1, 1]
-            const T Sn = std::min(std::max(S(i, j) / (p1 * p2), -1.0f), 1.0f);
-            // Update embedding covariance matrix S
+            const T Sn = std::min(std::max(S(i, j) / (p1[i] * p2[j]), -1.0f), 1.0f);
+            // Update activation covariance matrix S
             const T kappa1 = (Sn * (M_PI - std::acos(Sn)) + std::sqrt(1.0 - Sn * Sn)) / M_PI;
-            S(i, j) = kappa1 * p1 * p2;
-            // Only update kernel matrix H if dep >= fix_dep + 1 
-            //   because first fix_dep layers are untrained.
-            if (dep >= fix_dep + 1) {
-                const T kappa0 = (M_PI - std::acos(Sn)) / M_PI;
-                H(i, j) = S(i, j) + H(i, j) * kappa0;
-            }
+            S(i, j) = kappa1 * p1[i] * p2[j];
+            // Update kernel matrix H if indicated by update_H
+            const T kappa0 = (M_PI - std::acos(Sn)) / M_PI;
+            H(i, j) = S(i, j) + H(i, j) * kappa0;
         }
     }
 } 
