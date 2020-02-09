@@ -1,8 +1,8 @@
 from NtkInternal import VectorF, MatrixF
+from NTK import NtkIterator
 import math
 import numpy as np
 import unittest
-from utils import dot_prod_pre_allocated, NtkIterator
 
 def kernel_value_batch(X, d_max): 
     """
