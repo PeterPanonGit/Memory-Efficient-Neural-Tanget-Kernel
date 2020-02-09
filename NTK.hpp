@@ -116,7 +116,6 @@ void Ntk(const int dep,
             const T Sn = std::min(std::max(S(i, j) / (p1 * p2), -1.0f), 1.0f);
             // Update embedding covariance matrix S
             const T kappa1 = (Sn * (M_PI - std::acos(Sn)) + std::sqrt(1.0 - Sn * Sn)) / M_PI;
-            std::cout << i << "," << j << "," << p1 << "," << p2 << "," << Sn << "," << kappa1 << std::endl;
             S(i, j) = kappa1 * p1 * p2;
             // Only update kernel matrix H if dep >= fix_dep + 1 
             //   because first fix_dep layers are untrained.

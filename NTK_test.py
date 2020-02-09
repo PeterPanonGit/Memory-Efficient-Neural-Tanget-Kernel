@@ -1,8 +1,8 @@
-import NTK
+from NtkInternal import VectorF, MatrixF
 import math
 import numpy as np
 import unittest
-from utils import dot_prod_pre_allocated
+from utils import dot_prod_pre_allocated, NtkIterator
 
 def kernel_value_batch(X, d_max): 
     """
@@ -17,6 +17,7 @@ def kernel_value_batch(X, d_max):
         K: neural tanget kernel matrices at different layers and fixed number of layers
     """
     K = np.zeros((d_max, d_max, X.shape[0], X.shape[0]))
+    SS = np.zeros((d_max, d_max, X.shape[0], X.shape[0]))
     for fix_dep in range(d_max):
         S = np.matmul(X, X.T)
         H = np.zeros_like(S)
@@ -24,26 +25,27 @@ def kernel_value_batch(X, d_max):
             if fix_dep <= dep:
                 H += S
             K[dep][fix_dep] = H
+            SS[dep][fix_dep] = S
             L = np.diag(S)
             P = np.clip(np.sqrt(np.outer(L, L)), a_min = 1e-9, a_max = None)
             Sn = np.clip(S / P, a_min = -1, a_max = 1)
             S = (Sn * (math.pi - np.arccos(Sn)) + np.sqrt(1.0 - Sn * Sn)) * P / math.pi
             H = H * (math.pi - np.arccos(Sn)) / math.pi
-    return K
+    return K, SS
 
 class TestMatrix(unittest.TestCase):
     def setUp(self):
         self.epsilon = 1e-30
 
     def test_zero_init(self):
-        m = NTK.MatrixF(3, 2)
+        m = MatrixF(3, 2)
         a = np.array(m, copy=False)
         self.assertLess(np.sum(np.abs(a)), self.epsilon)
         self.assertEqual(a.dtype, np.float32)
 
     def test_set_val(self):
         # m and a are expected to share the same memory space
-        m = NTK.MatrixF(3, 2)
+        m = MatrixF(3, 2)
         a = np.array(m, copy=False)
 
         # Test if m changes, a changes
@@ -61,16 +63,16 @@ class TestMatrix(unittest.TestCase):
             self.assertEqual(str(e), "index (3, 0) is out of bound")
 
     def test_set_zero(self):
-        m = NTK.MatrixF(3, 2)
+        m = MatrixF(3, 2)
         m.set_val(0, 0, 1)
         m.set_zero()
         self.assertLess(np.sum(np.abs(np.array(m, copy=False))), self.epsilon)
 
     def test_copy_ctor(self):
-        m = NTK.MatrixF(3, 2)
+        m = MatrixF(3, 2)
         m.set_val(0, 0, 1)
 
-        m1 = NTK.MatrixF(m)
+        m1 = MatrixF(m)
         # confirm copy success
         self.assertEqual(m1.value(0, 0), 1)
 
@@ -80,10 +82,10 @@ class TestMatrix(unittest.TestCase):
         self.assertEqual(m1.value(0, 1), 0)
 
     def test_copy(self):
-        m = NTK.MatrixF(3, 2)
+        m = MatrixF(3, 2)
         m.set_val(0, 0, 1)
 
-        m1 = NTK.MatrixF(3, 2)
+        m1 = MatrixF(3, 2)
         m1.copy(m)
         # confirm copy success
         self.assertEqual(m1.value(0, 0), 1)
@@ -95,36 +97,45 @@ class TestMatrix(unittest.TestCase):
 
 class TestNTK(unittest.TestCase):
     def setUp(self):
-        self.epsilon = 1e-2
+        self.epsilon = 1e-3
 
-    def test_NTK(self):
-        # 2 data points, each data point has 3 features
+    def test_NTK_one_x(self):
+        # 1 data set, 2 data points, each data point has 3 features
         x = np.array([[0, -1.0, 1.0], [0.2, -1.2, 0.8]], dtype=np.float32)
         d_max = 10
-        # allocate memory for data
-        p = NTK.VectorF(np.linalg.norm(x, axis=1))
-        S = NTK.MatrixF(x.shape[0], x.shape[0])
-        H = NTK.MatrixF(S)
+
+        # NtkIterator instance
+        ntk_iter = NtkIterator(x, x, d_max)
 
         # compute neural tangent kernel with python implementation
-        K = kernel_value_batch(x, d_max)
+        K, Spy = kernel_value_batch(x, d_max)
 
-        fix_dep = 0
-        dot_prod_pre_allocated(x, x, S)
-        H.copy(S)
-        for dep in range(1, d_max):
-            NTK.Ntk(dep, fix_dep, p, p, S, H)
-            self.assertLess(np.sum(np.abs(H - K[dep][fix_dep])), self.epsilon)
+        for fix_dep in range(d_max - 1):
+            ntk_iter.set_fix_dep(fix_dep)
+            while ntk_iter.has_next():
+                Hpy = K[ntk_iter.dep][fix_dep]
+                ntk_iter.next()
+                self.assertLess(np.sum(np.abs(ntk_iter.H - Hpy)), self.epsilon)
 
-        fix_dep = 2
-        dot_prod_pre_allocated(x, x, S)
-        H.set_zero()
-        for dep in range(1, d_max):
-            if dep == fix_dep: H.copy(S)
-            NTK.Ntk(dep, fix_dep, p, p, S, H)
-            print(dep, np.array(H, copy=False), K[dep][fix_dep])
-            self.assertLess(np.sum(np.abs(H - K[dep][fix_dep])), self.epsilon)
+    def test_NTK_two_x(self):
+        # 2 data sets, 3 data point in first one, 2 data point in second one
+        # Each data point has 3 features
+        x1 = np.array([[0.1, 0.3, 0.05], [0.2, 0.1, 0.3], [0.4, 0.3, 0.4]])
+        x2 = np.array([[0, -1.0, 1.0], [0.2, -1.2, 0.8]])
+        d_max = 10
+
+        # NtkIterator instance
+        ntk_iter = NtkIterator(x1, x2, d_max)
+
+        # compute neural tangent kernel with python implementation
+        K, Spy = kernel_value_batch(np.vstack([x1, x2]), d_max)
+
+        for fix_dep in range(d_max - 1):
+            ntk_iter.set_fix_dep(fix_dep)
+            while ntk_iter.has_next():
+                Hpy = K[ntk_iter.dep][fix_dep][:x1.shape[0], x1.shape[0]:]
+                ntk_iter.next()
+                self.assertLess(np.sum(np.abs(ntk_iter.H - Hpy)), self.epsilon)
 
 if __name__ == '__main__':
     unittest.main()
-7

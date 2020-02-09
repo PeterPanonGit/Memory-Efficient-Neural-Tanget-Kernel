@@ -8,8 +8,8 @@ namespace py = pybind11;
 // wrap as Python module
 PYBIND11_MAKE_OPAQUE(std::vector<float>);
 
-PYBIND11_MODULE(NTK, m) {
-    m.doc() = "pybind11 NTK plugin";
+PYBIND11_MODULE(NtkInternal, m) {
+    m.doc() = "NTK C++ plugin";
 
     // Expose float type matrix
     // Double type Matrix class can be created similarly but skipped here.
