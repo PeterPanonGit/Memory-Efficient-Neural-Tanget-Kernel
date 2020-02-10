@@ -9,7 +9,7 @@ Neural Tanget Kernel (NTK) has attracted much attention recently because researc
 NTK computation is implemented in C++ with a easy to use wrapper in Python. The memory consumption for computing the NTK is 2N<sup>2</sup> because it requires one auxilary matrix of the same size as NTK. The auxiliary matrix can be discarded after NTK computation is finished. Memory efficient computation of [Kernel Ridge Regression](https://www.ics.uci.edu/~welling/classnotes/papers_class/Kernel-Ridge.pdf) based on the NTK has not been implemented yet. If we use [Arpack-Eigen](https://github.com/yixuan/arpack-eigen) to compute the exact or approximate inverse of the NTK matrix, we could probably expect that the total memory consumption of a Kernel Ridge Regression based on NTK would consume a few times of the memory of the NTK matrix.
 ## Setup
 ### Prerequisites
-g++(version > 7), Python3, numpy, sklearn
+g++(version > 7), pybind11, Python3, numpy, sklearn
 ### Build
 Before running the python code and Jupyter notebook example, you need to compile the C++ to a shared library using the following command:
 ```
