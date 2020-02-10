@@ -5,9 +5,10 @@
 
 namespace py = pybind11;
 
-// wrap as Python module
+// wrap float vector as Python module
 PYBIND11_MAKE_OPAQUE(std::vector<float>);
 
+// Export class and functions in NTK.hpp to python module
 PYBIND11_MODULE(NtkInternal, m) {
     m.doc() = "NTK C++ plugin";
 
@@ -40,6 +41,6 @@ PYBIND11_MODULE(NtkInternal, m) {
     // Expose float type vector. Double vector is skipped here.
     py::bind_vector<std::vector<float>>(m, "VectorF");
 
-    m.def("Ntk", &Ntk<float>, "Calculate the embedding covariance matrix \
-        and neural tangent kernel matrix");
+    m.def("NextLayerF", &NextLayer<float>, "Update the activation \
+        covariance matrix and neural tangent kernel matrix");
 }

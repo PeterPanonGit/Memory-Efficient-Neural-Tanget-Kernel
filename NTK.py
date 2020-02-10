@@ -1,4 +1,4 @@
-from NtkInternal import VectorF, MatrixF, Ntk
+from NtkInternal import VectorF, MatrixF, NextLayerF 
 import numpy as np
 
 def dot_prod_pre_allocated(x1:np.array, x2:np.array, m:MatrixF):
@@ -28,7 +28,7 @@ def dot_prod_pre_allocated(x1:np.array, x2:np.array, m:MatrixF):
 
 class NtkIterator:
     """
-    Wrapper class for the C++ Ntk() function
+    Wrapper class for the C++ NextLayerF() function
     At construction time, norm of input data is computed and save
         so that there is no need to recompute in every iteration,
         since the norm factor of activation covariance matrix
@@ -45,7 +45,8 @@ class NtkIterator:
         self.x2 = x2
         # d_max is the max layers of neural networks to be trained
         # It follows the python way of specifying range, which means
-        #   layer [1, 2, ..., d_max-1] are trained, but not including d_max
+        #   layer [1, 2, ..., d_max-1] are trained, but not including d_max.
+        #   d_max can be considered as the last layer, which is not hidden.
         self.d_max = d_max
         # p1 and p2 are clipped at 1e-9 to avoid division by 0
         self.p1 = VectorF(np.clip(np.linalg.norm(x1, axis=1), \
@@ -71,7 +72,7 @@ class NtkIterator:
         #   and thus it only makes sense to start training at fix_dep + 1
         self.dep = fix_dep + 1
         for dep in range(1, fix_dep + 1):
-            Ntk(self.p1, self.p2, self.S, self.H)
+            NextLayerF(self.p1, self.p2, self.S, self.H)
         # At the first trainable layer, H==S
         self.H.copy(self.S)
 
@@ -86,13 +87,5 @@ class NtkIterator:
         if self.dep is None or self.fix_dep is None:
             raise RuntimeError("Please call set_fix_dep() first")
 
-        Ntk(self.p1, self.p2, self.S, self.H)
+        NextLayerF(self.p1, self.p2, self.S, self.H)
         self.dep = self.dep + 1
-
-    def __del__(self):
-        """
-        Explicitly call destructors of the C++ objects to ensure their
-            destructors are called and their memories are freed.
-        """
-        del self.p1; del self.p2
-        del self.S; del self.H

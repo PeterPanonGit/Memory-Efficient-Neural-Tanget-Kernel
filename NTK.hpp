@@ -80,21 +80,21 @@ private:
 };
 
 // This function compute and update the S and H matrix
-//   given two datasets with n1 data points and n2 data points.
+//   to the next infinitely wide layer
 // p1: the sqrt of L2 norm of data set 1, shape: (n1,)
 // p2: the sqrt of L2 norm of data set 2, shape: (n2,)
 // The python wrapper guarantees that p1 and p2 > 1e-9 to avoid divison by 0.
 // S: the activation covariance matrix at dep, shape: (n1, n2)
-// H: is the Neural Tangent Kernel matrix at dep, shape: (N1, N2)
+// H: is the Neural Tangent Kernel matrix at dep, shape: (n1, n2)
 // Reference paper: https://arxiv.org/pdf/1910.01663.pdf
 // Reference python implementation: https://github.com/LeoYu/neural-tangent-kernel-UCI/blob/master/NTK.py
 // Comparing with python implementation, this C++ implementation
 //   compute everything in place and thus significantly saves memory.
 template <class T>
-void Ntk(const std::vector<T>& p1,
-         const std::vector<T>& p2,
-         Matrix<T>& S,
-         Matrix<T>& H) {
+void NextLayer(const std::vector<T>& p1,
+               const std::vector<T>& p2,
+               Matrix<T>& S,
+               Matrix<T>& H) {
     // The following logic implements the recursive relation
     //   of covariance matrix S and neural kernel matrix H in place.
     // The recursive relation is described in page 3 of
