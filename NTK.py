@@ -1,4 +1,4 @@
-from NtkInternal import VectorF, MatrixF, NextLayerF 
+from NtkInternal import VectorF, MatrixF, NextLayerF
 import numpy as np
 
 def dot_prod_pre_allocated(x1:np.array, x2:np.array, m:MatrixF):
@@ -29,16 +29,26 @@ def dot_prod_pre_allocated(x1:np.array, x2:np.array, m:MatrixF):
 class NtkIterator:
     """
     Wrapper class for the C++ NextLayerF() function
-    At construction time, norm of input data is computed and save
-        so that there is no need to recompute in every iteration,
-        since the norm factor of activation covariance matrix
-        does not change. This is a performance optimization.
-    At construction time, activation covariance matrix S and 
-        kernel matrix H memory are allocated and every update
-        is applied to S and H in place. This improves speed and
-        saves memory
     """
     def __init__(self, x1:np.array, x2:np.array, d_max:int):
+        """
+        At construction time, norm of input data is computed and save
+            so that there is no need to recompute in every iteration,
+            since the norm factor of activation covariance matrix
+            does not change. This is a performance optimization.
+        At construction time, activation covariance matrix S and 
+            kernel matrix H memory are allocated and every update
+            is applied to S and H in place. This improves speed and
+            saves memory
+
+        Args:
+            x1: matrix of shape (n1, k)
+            x2: matrix of shape (n2, k)
+            d_max: number of layers in the inifitely wide neural network.
+
+        Properties:
+            H: the Neural Tangent Kernel matrix of shape (n1, n2) 
+        """
         # self.x1 and self.x2 are views of x1 and x2.
         # They do not create additional memory
         self.x1 = x1
@@ -65,7 +75,15 @@ class NtkIterator:
         """
         This method must be called before next(), otherwise dep and fix_dep
             will be None and next() will throw error
+        When this method is called, the NTK matrix H will be initialized to
+            the activation covariance S, and dep will be set to fix_dep + 1,
+            because the first fix_dep layers are fixed (not trained).
+
+        Args:
+            fix_dep: the number of layers that are fixed (not trained)
         """
+        if fix_dep >= self.d_max:
+            raise ValueError("fix_dep must be smaller than d_max")
         self.fix_dep = fix_dep
         dot_prod_pre_allocated(self.x1, self.x2, self.S)
         # If first fix_dep layers are not trained, kernel matrix H will be 0
