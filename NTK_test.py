@@ -99,6 +99,30 @@ class TestNTK(unittest.TestCase):
     def setUp(self):
         self.epsilon = 1e-3
 
+    def test_NTK_set_fix_dep(self):
+        # 1 data set, 2 data points, each data point has 3 features
+        x = np.array([[0, -1.0, 1.0], [0.2, -1.2, 0.8]], dtype=np.float32)
+        d_max = 10
+
+        # NtkIterator instance
+        fix_dep = 3
+        ntk_iter = NtkIterator(x, x, d_max)
+        ntk_iter.set_fix_dep(fix_dep)
+
+        # compute neural tangent kernel with python implementation
+        K, Spy = kernel_value_batch(x, d_max)
+
+        # confirm that H is initialized to fix_dep layers
+        Hpy = K[fix_dep][fix_dep]
+        self.assertEqual(ntk_iter.dep, fix_dep + 1)
+        self.assertLess(np.sum(np.abs(ntk_iter.H - Hpy)), self.epsilon)
+
+        # confirm error will be thrown if fix_dep >= d_max
+        try:
+            ntk_iter.set_fix_dep(d_max)
+        except Exception as e:
+            self.assertEqual(str(e), "fix_dep must be smaller than d_max")
+        
     def test_NTK_one_x(self):
         # 1 data set, 2 data points, each data point has 3 features
         x = np.array([[0, -1.0, 1.0], [0.2, -1.2, 0.8]], dtype=np.float32)
